@@ -3,6 +3,8 @@ import numpy as np
 import scipy.optimize as op
 import csv
 import math
+import random
+
 
 # CostFunction gets a X that is  m x (n+1) for theta0
 # y is m x 1 theta is (n+1) x 1
@@ -30,14 +32,13 @@ def gradient(theta, X, y, lda ):
 
 def trainlinearregression( X, y, lda, maxiter):
     m,n = X.shape
-    print (str(m) + " " + str(n) )
     initial_theta = np.zeros((n, 1))
     result = op.minimize(fun = costfunction, x0 = initial_theta, args = (X, y, lda), method = 'TNC',
              jac = gradient, options ={ 'disp': False, 'maxiter': maxiter }  )
     optimal_theta = result.x
     return optimal_theta
 
-def cost(theta, X, y):
+def cost_matrix(theta, X, y):
     m,n = X.shape
     theta = theta.reshape((n, 1))
     y = y.reshape((m, 1))
@@ -133,35 +134,81 @@ def nfldataread(ppos) :
 
                     string = [ str(playerindex.index(name)+1), str(map_year), str(playing_home), str(played_against),
                                str(game_week), str(time_played), str(team_score), str(opposition_score),
-                               str(month_played), str(rushing_yards), str(name) ]
+                               str(month_played), str(total_points), str(name) ]
                     wfha.writerow(string)
                     countr = countr +1
             count = count + 1
         wfh.close()
-    #print (count) #Total records
+    return countr #Total records
     #print (countr) #Matched records
 
+def createrandom(master,mtotal,mtrain,cv) :
+    rndtemp = list(range(0,mtotal))
+    random.shuffle(rndtemp)
+    rndlinelist = sorted(rndtemp[1:mtrain+1])
+    if cv:
+        strng = "cv"
+        wfh2 = open ( (master + "minus" + strng + ".csv"), 'w', newline="")
+        wfha2 = csv.writer(wfh2)
+    else:
+        strng = "train"
+    wfh = open ( (strng + str(mtrain) + ".csv"), 'w', newline="")
+    wfha = csv.writer(wfh)
+    count = 0
+    countr = 0
+    with open((str(master) + ".csv"), 'r') as csvfile:
+        reader = csv.reader(csvfile, delimiter=',')
+        for row in reader:
+            if count in rndlinelist:
+                countr = countr +1 #matched
+                wfha.writerow(row)
+            elif ((count not in rndlinelist) and cv) :
+                wfha2.writerow(row)
 
+            count = count +1
+    wfh.close()
+    if cv:
+        wfh2.close()
+    return countr
+
+def trainregression(mfile,lda,maxiter):
+    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(9) )
+    mtr,ntr = np.shape(Xtemp)
+    Xtrain = np.hstack ((np.ones ((mtr, 1)), Xtemp))
+    Ytrain = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (9,) )
+    theta = trainlinearregression( Xtrain, Ytrain, lda, maxiter)
+    return theta
+
+def cost_file(mfile, theta):
+    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(9) )
+    m,n = np.shape(Xtemp)
+    X = np.hstack ((np.ones ((m, 1)), Xtemp))
+    y = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (9,) )
+    theta = theta.reshape((n+1, 1))
+    y = y.reshape((m, 1))
+    error = np.dot(X, theta) - y
+    rmsqe = sum(abs(error))
+    return rmsqe
 
 def main():
 
     lda = 0.000001
     maxiter = 200
-    playpos = ['RB' ]
+    master = 'RB'
+    numcv = 2000
+    iscv = 1
+    istrain = 0
 
-    for pos in playpos:
-        nfldataread(pos)
-        Xtemp = np.loadtxt( (pos +'.csv'), dtype = float, delimiter = ',', usecols = range(9) )
-        mtr,ntr = np.shape(Xtemp)
-        Xtrain = np.hstack ((np.ones ((mtr, 1)), Xtemp))
-        Ytrain = np.loadtxt( (pos + '.csv'), dtype = float, delimiter = ',', usecols = (9,) )
-        theta = trainlinearregression( Xtrain, Ytrain, lda, maxiter)
-        print(theta)
-        errtr, rmsqetr = cost(theta, Xtrain, Ytrain)
-        #print(errtr) # Per game Error
-        print (pos + "'s RMSQE is:" + str(rmsqetr))
-
-
+    mtotal = nfldataread(master) #returns num matched records
+    print ("mtotal "+ str(mtotal))
+    cvcount = createrandom(master,mtotal,numcv,iscv) #creates $master + "minuscv".csv and cv + $m.csv
+    print ("cvcount "+ str(cvcount))
+    for m in range(100,(mtotal-numcv),100):
+        createrandom((master + "minus" + "cv"), (mtotal-numcv), m, istrain ) #creates $master + "minuscsv" + $m.csv
+        theta = trainregression(("train" + str(m)),lda,maxiter)
+        errortrain = cost_file(("train" + str(m)), theta)
+        errorcv = cost_file(("cv"+str(cvcount)), theta)
+        print ( "Trng m : " + str(m) + " Trng err : " + str(errortrain) + " cv error : " +  str(errorcv))
 if __name__ == '__main__' :
     main()
 else :
