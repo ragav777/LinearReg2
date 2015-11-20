@@ -70,7 +70,7 @@ def nfldataread(ppos) :
             if count != 0 :
                 year = str(row[0]) #i
                 game_eid = row[1] #i
-                game_week = row[2] #ni
+                game_week = int(row[2]) #ni
                 game_time = str(row[5]) #ni
                 home_team = row[6] #i
                 away_team = row[7] #i
@@ -84,7 +84,7 @@ def nfldataread(ppos) :
                 #receiving_rec = row[34]
                 #receiving_twopta = row[36]
                 receiving_yds = int(row[38])
-                #rushing_att = row[39] #i
+                rushing_att = int(row[39]) #i
                 #reciving_twoptm = row[40] #o
                 #rushing_lngtd = row[44]
                 #receiving_lng = row[48]
@@ -132,9 +132,12 @@ def nfldataread(ppos) :
                     total_points = ((rushing_tds+ receiving_tds)*6) + (( rushing_yards +receiving_yds)/10) \
                                    -(fumbles_tot*2)
 
+                    #temp = -4.3*(playerindex.index(name)+1) + (5.2*map_year) + (1.0033*playing_home)-(2.03*played_against) +(1*game_week)\
+                            #+(2.5*game_week) + (1*time_played) + (2.6*team_score) + (3.2*opposition_score) + (1.6*month_played)
+
                     string = [ str(playerindex.index(name)+1), str(map_year), str(playing_home), str(played_against),
                                str(game_week), str(time_played), str(team_score), str(opposition_score),
-                               str(month_played), str(total_points), str(name) ]
+                               str(month_played), str(tmap[team]), str(rushing_att), str(total_points), str(name)  ]
                     wfha.writerow(string)
                     countr = countr +1
             count = count + 1
@@ -172,27 +175,28 @@ def createrandom(master,mtotal,mtrain,cv) :
     return countr
 
 def trainregression(mfile,lda,maxiter):
-    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(9) )
+    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(11) )
     mtr,ntr = np.shape(Xtemp)
     Xtrain = np.hstack ((np.ones ((mtr, 1)), Xtemp))
-    Ytrain = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (9,) )
+    Ytrain = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (11,) )
     theta = trainlinearregression( Xtrain, Ytrain, lda, maxiter)
     return theta
 
 def cost_file(mfile, theta):
-    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(9) )
+    Xtemp = np.loadtxt( (mfile +'.csv'), dtype = float, delimiter = ',', usecols = range(11) )
     m,n = np.shape(Xtemp)
     X = np.hstack ((np.ones ((m, 1)), Xtemp))
-    y = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (9,) )
+    y = np.loadtxt( (mfile + '.csv'), dtype = float, delimiter = ',', usecols = (11,) )
     theta = theta.reshape((n+1, 1))
     y = y.reshape((m, 1))
     error = np.dot(X, theta) - y
-    rmsqe = sum(abs(error))
+    # rmsqe = sum(abs(error))
+    rmsqe = math.sqrt(sum(np.square(error))/m)
     return rmsqe
 
 def main():
 
-    lda = 0.000001
+    lda = 0.001
     maxiter = 200
     master = 'RB'
     numcv = 2000
